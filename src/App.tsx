@@ -14,10 +14,10 @@ import {invoke} from '@tauri-apps/api/tauri';
 
 function App() {
 
-
     const [active, setActive] = useState(false)
-    const [ enabled, setenabled ] = useState(false);
+    const [ enabled, setEnabled ] = useState(false);
     const [threshold, setThreshold] = useState(30);
+    const [input, setInput] = useState(0);
 
     async function listen() {
         const stream = await navigator.mediaDevices.getUserMedia({
@@ -40,40 +40,36 @@ function App() {
             analyser.getByteFrequencyData(array);
             const arraySum = array.reduce((a, value) => a + value, 0);
             const average = Math.round(arraySum / array.length);
-            console.log(threshold, average);
-            if (average >= threshold) {
-                if(!active) return
-                setActive(true);
-                if(enabled) {
-                    invoke("mouse_click");
-                }
-            }else {
-                if(active) return;
-                setActive(false);
-            }
+            setInput(average);
         };
     }
 
     useEffect(() => {
-
-        console.log("test");
-
-        (async () => {
-            await listen();
-        })();
+        listen();
     });
 
-  return (
-      <Container>
-          <VStack>
-              <Heading color={'white'} size={'3xl'}>VTC 4</Heading>
-              <Heading color={'white'} size={'xs'}>This program works off your system default audio input device</Heading>
-              <Heading size={'sm'} textAlign={'center'} color={'white'} > Created by Lizard and DrFineSir</Heading>
-          </VStack>
+    useEffect(() => {
+        (async() => {
+            if(input >= threshold) {
+                setActive(true);
+                if(enabled) await invoke('mouse_click');
+            } else {
+                if(active) setActive(false);
+            }
+        })();
+    }, [input]);
+
+    return (
+        <Container>
+            <VStack>
+                <Heading color={'white'} size={'3xl'}>VTC 4</Heading>
+                <Heading color={'white'} size={'xs'}>This program works off your system default audio input device</Heading>
+                <Heading size={'sm'} textAlign={'center'} color={'white'} > Created by Lizard and DrFineSir</Heading>
+            </VStack>
             <VStack mt={8} spacing={10}>
                 <Heading size={'md'} color={'white'}>Threshold Sensitivity</Heading>
                 <Slider
-                    onChangeEnd={(event) => {setThreshold(event)}} aria-label='slider-ex-1' defaultValue={30}>
+                    onChangeEnd={(value) => setThreshold(value)} aria-label='slider-ex-1' defaultValue={30}>
                     <SliderMark color='white' value={0} mt='1' ml='-2.5' fontSize='sm'>
                         0
                     </SliderMark>
@@ -106,10 +102,10 @@ function App() {
                     <SliderThumb />
                 </Slider>
                 <Box  textAlign='center' rounded='full' bg={active ? 'green.600' : 'red.600'} w={"100%"}><b>{active ? 'Active' : "Not active"}</b></Box>
-                <Checkbox onChange={(e) => setenabled(e.target.checked)} color='white'><b>Enable the Clicky!</b></Checkbox>
+                <Checkbox onChange={() => setEnabled(!enabled)} color='white'><b>Enable the Clicky!</b></Checkbox>
             </VStack>
-      </Container>
-  );
+        </Container>
+    );
 }
 
 export default App;
