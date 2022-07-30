@@ -46,7 +46,7 @@ function App() {
 
     useEffect(() => {
         listen();
-    });
+    }, []);
 
     useEffect(() => {
         (async() => {
@@ -101,7 +101,7 @@ function App() {
                     </SliderTrack>
                     <SliderThumb />
                 </Slider>
-                <Box  textAlign='center' rounded='full' bg={active ? 'green.600' : 'red.600'} w={"100%"}><b>{active ? 'Active' : "Not active"}</b></Box>
+                <Box  textAlign='center' rounded='full' bg={active ? 'green.600' : 'red.600'} w={"100%"}><b>{active ? 'Would Click' : "Wouldndt Click"}</b></Box>
                 <Checkbox onChange={() => setEnabled(!enabled)} color='white'><b>Enable the Clicky!</b></Checkbox>
             </VStack>
         </Container>
