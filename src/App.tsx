@@ -17,51 +17,10 @@ function App() {
     const [active, setActive] = useState(false)
     const [ enabled, setEnabled ] = useState(false);
     const [threshold, setThreshold] = useState(30);
-    const [input, setInput] = useState(0);
-
-    async function listen() {
-        const stream = await navigator.mediaDevices.getUserMedia({
-            audio: true,
-            video: false,
-        });
-        const audioContext = new AudioContext();
-        const analyser = audioContext.createAnalyser();
-        const microphone = audioContext.createMediaStreamSource(stream);
-        const scriptProcessor = audioContext.createScriptProcessor(2048, 1, 1);
-
-        analyser.smoothingTimeConstant = 0.8;
-        analyser.fftSize = 32;
-
-        microphone.connect(analyser);
-        analyser.connect(scriptProcessor);
-        scriptProcessor.connect(audioContext.destination);
-        scriptProcessor.onaudioprocess = function () {
-            const array = new Uint8Array(analyser.frequencyBinCount);
-            analyser.getByteFrequencyData(array);
-            const arraySum = array.reduce((a, value) => a + value, 0);
-            const average = Math.round(arraySum / array.length);
-            setInput(average);
-        };
-    }
-
-    useEffect(() => {
-        listen();
-    }, []);
-
-    useEffect(() => {
-        (async() => {
-            if(input >= threshold) {
-                setActive(true);
-                if(enabled) await invoke('mouse_click');
-            } else {
-                if(active) setActive(false);
-            }
-        })();
-    }, [input]);
 
     return (
-        <Container>
-            <VStack>
+        <Container>            <VStack>
+
                 <Heading color={'white'} size={'3xl'}>VTC 4</Heading>
                 <Heading color={'white'} size={'xs'}>This program works off your system default audio input device</Heading>
                 <Heading size={'sm'} textAlign={'center'} color={'white'} > Created by Lizard and DrFineSir</Heading>

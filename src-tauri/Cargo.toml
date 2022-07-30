@@ -20,6 +20,10 @@ serde = { version = "1.0", features = ["derive"] }
 tauri = { version = "1.0.3", features = ["api-all"] }
 enigo = "0.0.14"
 parking_lot = "0.12.1"
+anyhow = "1.0.58"
+clap = "3.2.16"
+cpal = "0.13.5"
+ringbuf = "0.2.8"
 
 
 [features]
