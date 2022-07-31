@@ -126,7 +126,7 @@ fn main() -> Result<()> {
         .manage(state)
         .setup(|app| {
             let handle = app.app_handle();
-            thread::spawn(move || {
+            thread::spawn(move || loop {
                 if let Ok(payload) = rx.recv() {
                     handle
                         .emit_all("threshold", payload)
@@ -155,12 +155,13 @@ fn input_fn(data: &[f32], channel: &mut Sender<Payload>, state: &Mutex<State>) {
     let met = volume >= state.threshold;
 
     if met && state.enabled {
+        println!("met!");
         state.click();
     }
 
-    channel
-        .send(Payload { volume, met })
-        .expect("failed to send payload to channel");
+    if let Err(e) = channel.send(Payload { volume, met }) {
+        eprintln!("errored at sending data: {}", e);
+    }
 }
 
 fn err_fn(_err: cpal::StreamError) {
