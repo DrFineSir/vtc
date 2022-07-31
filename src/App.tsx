@@ -13,6 +13,12 @@ import {invoke} from '@tauri-apps/api/tauri';
 import {listen} from '@tauri-apps/api/event';
 
 
+interface Payload {
+    volume: number;
+    met: boolean;
+}
+
+
 function App() {
 
     const [active, setActive] = useState(false)
@@ -22,6 +28,7 @@ function App() {
     // Sketchy work around to send the command one time once set
     const [once, setOnce] = useState(30);
 
+    // ***************** useEffect *****************
     useEffect(() => {
         // On threshold change invoke command to set the threshold on the backend
         invoke('set_threshold', {threshold});
@@ -29,8 +36,10 @@ function App() {
 
     useEffect(() => {
         (async () => {
-            await listen<string>('threshold', (event) => {
-                setActive(event.payload as unknown as boolean)
+            await listen<Payload>('threshold', ( event ) => {
+                const {volume, met} = event.payload;
+                setActive(met);
+                console.log(volume);
             });
         })();
     })
@@ -39,6 +48,7 @@ function App() {
         // On enabled change invoke the command to set the enabled state on the backend
         invoke('set_enabled', {enabled});
     }, [enabled]);
+    // ***************** useEffect *****************
 
     return (
         <Container>            <VStack>
