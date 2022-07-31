@@ -70,12 +70,12 @@ struct Payload {
 }
 
 #[tauri::command]
-fn set_enabled(state: tauri::State<Mutex<State>>, enable: bool) {
+fn set_enabled(state: tauri::State<Arc<Mutex<State>>>, enable: bool) {
     state.lock().enabled = enable;
 }
 
 #[tauri::command]
-fn set_threshold(state: tauri::State<Mutex<State>>, threshold: f32) {
+fn set_threshold(state: tauri::State<Arc<Mutex<State>>>, threshold: f32) {
     state.lock().threshold = threshold as i32;
 }
 
