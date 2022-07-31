@@ -1,203 +1,168 @@
 #![warn(clippy::all)]
 #![cfg_attr(
-all(not(debug_assertions), target_os = "windows"),
-windows_subsystem = "windows"
+    all(not(debug_assertions), target_os = "windows"),
+    windows_subsystem = "windows"
 )]
 
-use std::ops::{Deref, DerefMut};
+use std::{
+    ops::{Deref, DerefMut},
+    sync::{
+        mpsc::{channel, Sender},
+        Arc,
+    },
+    thread,
+};
 
 use enigo::*;
 use parking_lot::Mutex;
 
-extern crate anyhow;
-extern crate clap;
-extern crate cpal;
-extern crate ringbuf;
-
-use anyhow::Context;
-use clap::arg;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use ringbuf::RingBuffer;
+use serde::Serialize;
+use tauri::Manager;
+
+type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
 struct Mouse(Enigo);
 
 unsafe impl Sync for Mouse {}
 
 impl Deref for Mouse {
-  type Target = Enigo;
+    type Target = Enigo;
 
-  fn deref(&self) -> &Self::Target {
-    &self.0
-  }
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
 }
 
 impl DerefMut for Mouse {
-  fn deref_mut(&mut self) -> &mut Self::Target {
-    &mut self.0
-  }
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
 }
 
-#[derive(Debug)]
-struct Opt {
-  #[cfg(all(
-  any(target_os = "linux", target_os = "dragonfly", target_os = "freebsd"),
-  feature = "jack"
-  ))]
-  jack: bool,
-
-  latency: f32,
-  input_device: String,
-  output_device: String,
+struct State {
+    mouse: Mouse,
+    enabled: bool,
+    threshold: i32,
+    met: bool,
 }
 
-impl Opt {
-  fn from_args() -> anyhow::Result<Self> {
-    let app = clap::Command::new("feedback")
-        .arg(arg!(
-            -l --latency [DELAY_MS] "Specify the delay between input and output [default: 150]"))
-        .arg(arg!([IN] "The input audio device to use"))
-        .arg(arg!([OUT] "The output audio device to use"));
+impl State {
+    pub fn new() -> Self {
+        Self {
+            mouse: Mouse(Enigo::new()),
+            enabled: false,
+            threshold: 30,
+            met: false,
+        }
+    }
 
-    #[cfg(all(
-    any(target_os = "linux", target_os = "dragonfly", target_os = "freebsd"),
-    feature = "jack"
-    ))]
-        let app = app.arg(arg!(-j --jack "Use the JACK host"));
-    let matches = app.get_matches();
-    let latency: f32 = matches
-        .value_of("latency")
-        .unwrap_or("150")
-        .parse()
-        .context("parsing latency option")?;
-    let input_device = matches.value_of("IN").unwrap_or("default").to_string();
-    let output_device = matches.value_of("OUT").unwrap_or("default").to_string();
+    pub fn click(&mut self) {
+        self.mouse.mouse_click(MouseButton::Left);
+    }
+}
 
-    #[cfg(all(
-    any(target_os = "linux", target_os = "dragonfly", target_os = "freebsd"),
-    feature = "jack"
-    ))]
-    return Ok(Opt {
-      jack: matches.is_present("jack"),
-      latency,
-      input_device,
-      output_device,
-    });
-
-    #[cfg(any(
-    not(any(target_os = "linux", target_os = "dragonfly", target_os = "freebsd")),
-    not(feature = "jack")
-    ))]
-    Ok(Opt {
-      latency,
-      input_device,
-      output_device,
-    })
-  }
+#[derive(Serialize, Clone, Copy)]
+struct Payload {
+    volume: i32,
+    met: bool,
 }
 
 #[tauri::command]
-fn mouse_click(mouse: tauri::State<Mutex<Mouse>>) {
-  mouse.lock().mouse_click(MouseButton::Left)
+fn set_enabled(state: tauri::State<Mutex<State>>, enable: bool) {
+    state.lock().enabled = enable;
 }
 
-fn main() -> anyhow::Result<()> {
-  tauri::Builder::default()
-      .manage(Mutex::new(Mouse(Enigo::new())))
-      .invoke_handler(tauri::generate_handler![mouse_click])
-      .run(tauri::generate_context!())
-      .expect("error while running tauri application");
+#[tauri::command]
+fn set_threshold(state: tauri::State<Mutex<State>>, threshold: f32) {
+    state.lock().threshold = threshold as i32;
+}
 
-  let opt = Opt::from_args()?;
+fn main() -> Result<()> {
+    let host = cpal::default_host();
 
-  #[cfg(any(
-  not(any(target_os = "linux", target_os = "dragonfly", target_os = "freebsd")),
-  not(feature = "jack")
-  ))]
-      let host = cpal::default_host();
+    let input_device = host
+        .default_input_device()
+        .expect("failed to find input device");
 
-  // Find devices.
-  let input_device = if opt.input_device == "default" {
-    host.default_input_device()
-  } else {
-    host.input_devices()?
-        .find(|x| x.name().map(|y| y == opt.input_device).unwrap_or(false))
-  }
-      .expect("failed to find input device");
+    println!("Using input device: \"{}\"", input_device.name()?);
 
-  let output_device = if opt.output_device == "default" {
-    host.default_output_device()
-  } else {
-    host.output_devices()?
-        .find(|x| x.name().map(|y| y == opt.output_device).unwrap_or(false))
-  }
-      .expect("failed to find output device");
+    // We'll try and use the same configuration between streams to keep it simple.
+    let config: cpal::StreamConfig = input_device.default_input_config()?.into();
 
-  println!("Using input device: \"{}\"", input_device.name()?);
+    // Create a delay in case the input and output devices aren't synced.
+    let latency_frames = (150. / 1_000.0) * config.sample_rate.0 as f32;
+    let latency_samples = latency_frames as usize * config.channels as usize;
 
-  // We'll try and use the same configuration between streams to keep it simple.
-  let config: cpal::StreamConfig = input_device.default_input_config()?.into();
+    // The buffer to share samples
+    let ring = RingBuffer::new(latency_samples * 2);
+    let (mut producer, _) = ring.split();
 
-  // Create a delay in case the input and output devices aren't synced.
-  let latency_frames = (opt.latency / 1_000.0) * config.sample_rate.0 as f32;
-  let latency_samples = latency_frames as usize * config.channels as usize;
+    // Fill the samples with 0.0 equal to the length of the delay.
+    for _ in 0..latency_samples {
+        // The ring buffer has twice as much space as necessary to add latency here,
+        // so this should never fail
+        producer.push(0.0).unwrap();
+    }
 
-  // The buffer to share samples
-  let ring = RingBuffer::new(latency_samples * 2);
-  let (mut producer, mut consumer) = ring.split();
+    let state = Arc::new(Mutex::new(State::new()));
+    let (mut tx, rx) = channel::<Payload>();
+    let state1 = Arc::clone(&state);
 
-  // Fill the samples with 0.0 equal to the length of the delay.
-  for _ in 0..latency_samples {
-    // The ring buffer has twice as much space as necessary to add latency here,
-    // so this should never fail
-    producer.push(0.0).unwrap();
-  }
+    let input_stream = input_device.build_input_stream(
+        &config,
+        move |data: &[f32], _: &cpal::InputCallbackInfo| input_fn(data, &mut tx, &state1),
+        err_fn,
+    )?;
 
-  let input_data_fn = move |data: &[f32], _: &cpal::InputCallbackInfo| {
-    let mut output_fell_behind = false;
+    println!(
+        "Starting the input and output streams with `{}` milliseconds of latency.",
+        150
+    );
+    input_stream.play()?;
 
-    // print input volume
+    tauri::Builder::default()
+        .manage(state)
+        .setup(|app| {
+            let handle = app.app_handle();
+            thread::spawn(move || {
+                if let Ok(payload) = rx.recv() {
+                    handle
+                        .emit_all("threshold", payload)
+                        .expect("Could not emit event")
+                }
+            });
+
+            Ok(())
+        })
+        .invoke_handler(tauri::generate_handler![set_enabled, set_threshold])
+        .run(tauri::generate_context!())
+        .expect("error while running tauri application");
+
+    Ok(())
+}
+
+fn input_fn(data: &[f32], channel: &mut Sender<Payload>, state: &Mutex<State>) {
     let mut sum = 0.0;
     for i in 0..data.len() {
-      sum += data[i].powi(2);
+        sum += data[i].powi(2);
     }
     let volume = sum.sqrt() as i32 * 5;
-    println!("input volume: {}", volume);
 
-  };
+    let mut state = state.lock();
 
-  let output_data_fn = move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
-    let mut input_fell_behind = false;
-    for sample in data {
-      *sample = match consumer.pop() {
-        Some(s) => s,
-        None => {
-          input_fell_behind = true;
-          0.0
-        }
-      };
+    let met = volume >= state.threshold;
+
+    if met && state.enabled {
+        state.click();
     }
-    if input_fell_behind {
-      eprintln!("input stream fell behind: try increasing latency");
-    }
-  };
 
-  // Build streams.
-  println!(
-    "Attempting to build both streams with f32 samples and `{:?}`.",
-    config
-  );
-  let input_stream = input_device.build_input_stream(&config, input_data_fn, err_fn)?;
-  println!("Successfully built streams.");
-
-  // Play the streams.
-  println!(
-    "Starting the input and output streams with `{}` milliseconds of latency.",
-    opt.latency
-  );
-  input_stream.play()?;
-
+    channel
+        .send(Payload { volume, met })
+        .expect("failed to send payload to channel");
 }
 
 fn err_fn(_err: cpal::StreamError) {
-  eprintln!("an error occurred on stream");
+    eprintln!("an error occurred on stream");
 }
