@@ -2,7 +2,7 @@ import React, {useEffect, useState} from 'react';
 import {
     Box, Checkbox,
     Container,
-    Heading, RangeSliderTrack,
+    Heading, Progress, RangeSliderTrack,
     Slider,
     SliderFilledTrack, SliderMark,
     SliderThumb,
@@ -21,7 +21,7 @@ interface Payload {
 
 function App() {
 
-    let volumeD: number = 0
+    const [volumeD, setVolumeD] = useState(0);
 
     const [active, setActive] = useState(false)
     const [enable, setEnabled] = useState(false);
@@ -42,8 +42,7 @@ function App() {
             await listen<Payload>('threshold', ( event ) => {
                 const { volume, met } = event.payload;
                 setActive(met);
-                volumeD = volume
-                console.log(volume);
+                setVolumeD(volume);
             });
         })();
     })
@@ -98,11 +97,7 @@ function App() {
                     </SliderTrack>
                     <SliderThumb />
                 </Slider>
-                <Slider>
-                    <SliderTrack >
-                        <SliderFilledTrack />
-                    </SliderTrack>
-                </Slider>
+                <Progress width={'full'} value={volumeD} />
                 <Box  textAlign='center' rounded='full' bg={active ? 'green.600' : 'red.600'} w={"100%"}><b>{active ? 'Would Click' : "Would not Click"}</b></Box>
                 <Checkbox onChange={(e) => setEnabled(e.currentTarget.checked)} color='white'><b>Enable the Clicky!</b></Checkbox>
             </VStack>
