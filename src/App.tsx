@@ -10,13 +10,35 @@ import {
     VStack,
 } from '@chakra-ui/react';
 import {invoke} from '@tauri-apps/api/tauri';
+import {listen} from '@tauri-apps/api/event';
 
 
 function App() {
 
     const [active, setActive] = useState(false)
-    const [ enabled, setEnabled ] = useState(false);
+    const [enabled, setEnabled] = useState(false);
     const [threshold, setThreshold] = useState(30);
+
+    // Sketchy work around to send the command one time once set
+    const [once, setOnce] = useState(30);
+
+    useEffect(() => {
+        // On threshold change invoke command to set the threshold on the backend
+        invoke('set_threshold', {threshold});
+    }, [once]);
+
+    useEffect(() => {
+        (async () => {
+            await listen<string>('threshold', (event) => {
+                setActive(event.payload as unknown as boolean)
+            });
+        })();
+    })
+
+    useEffect(() => {
+        // On enabled change invoke the command to set the enabled state on the backend
+        invoke('set_enabled', {enabled});
+    }, [enabled]);
 
     return (
         <Container>            <VStack>
@@ -28,7 +50,9 @@ function App() {
             <VStack mt={8} spacing={10}>
                 <Heading size={'md'} color={'white'}>Threshold Sensitivity</Heading>
                 <Slider
-                    onChangeEnd={(value) => setThreshold(value)} aria-label='slider-ex-1' defaultValue={30}>
+                    onChange={(value) => setThreshold(value)}
+                    onChangeEnd={(value) => setOnce(value)}
+                    aria-label='slider-ex-1' defaultValue={30}>
                     <SliderMark color='white' value={0} mt='1' ml='-2.5' fontSize='sm'>
                         0
                     </SliderMark>
@@ -60,7 +84,7 @@ function App() {
                     </SliderTrack>
                     <SliderThumb />
                 </Slider>
-                <Box  textAlign='center' rounded='full' bg={active ? 'green.600' : 'red.600'} w={"100%"}><b>{active ? 'Would Click' : "Wouldndt Click"}</b></Box>
+                <Box  textAlign='center' rounded='full' bg={active ? 'green.600' : 'red.600'} w={"100%"}><b>{active ? 'Would Click' : "Would not Click"}</b></Box>
                 <Checkbox onChange={() => setEnabled(!enabled)} color='white'><b>Enable the Clicky!</b></Checkbox>
             </VStack>
         </Container>
