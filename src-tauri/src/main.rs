@@ -92,7 +92,7 @@ fn main() -> Result<()> {
     let config: cpal::StreamConfig = input_device.default_input_config()?.into();
 
     // Create a delay in case the input and output devices aren't synced.
-    let latency_frames = (150. / 1_000.0) * config.sample_rate.0 as f32;
+    let latency_frames = config.sample_rate.0 as f32;
     let latency_samples = latency_frames as usize * config.channels as usize;
 
     // The buffer to share samples
@@ -116,10 +116,6 @@ fn main() -> Result<()> {
         err_fn,
     )?;
 
-    println!(
-        "Starting the input and output streams with `{}` milliseconds of latency.",
-        150
-    );
     input_stream.play()?;
 
     tauri::Builder::default()
@@ -148,14 +144,13 @@ fn input_fn(data: &[f32], channel: &mut Sender<Payload>, state: &Mutex<State>) {
     for i in 0..data.len() {
         sum += data[i].powi(2);
     }
-    let volume = sum.sqrt() as i32 * 5;
+    let volume = sum.sqrt() as i32 * 15;
 
     let mut state = state.lock();
 
     let met = volume >= state.threshold;
 
     if met && state.enabled {
-        println!("met!");
         state.click();
     }
 
