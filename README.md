@@ -4,7 +4,7 @@
 
 
 ### Glad to see you here!  
-This program maps realtime mic input to voice clicks. Perfect for cookie clicker, all you have to do is scream and your clicking.   
+This program maps realtime mic input to mouse clicks. Perfect for cookie clicker, all you have to do is scream and your clicking.   
 
 Build using Tauri and React.
 
