@@ -2,7 +2,7 @@ import React, {useEffect, useState} from 'react';
 import {
     Box, Checkbox,
     Container,
-    Heading,
+    Heading, RangeSliderTrack,
     Slider,
     SliderFilledTrack, SliderMark,
     SliderThumb,
@@ -21,12 +21,15 @@ interface Payload {
 
 function App() {
 
+    let volumeD: number = 0
+
     const [active, setActive] = useState(false)
-    const [enabled, setEnabled] = useState(false);
+    const [enable, setEnabled] = useState(false);
     const [threshold, setThreshold] = useState(30);
 
     // Sketchy work around to send the command one time once set
     const [once, setOnce] = useState(30);
+
 
     // ***************** useEffect *****************
     useEffect(() => {
@@ -37,8 +40,9 @@ function App() {
     useEffect(() => {
         (async () => {
             await listen<Payload>('threshold', ( event ) => {
-                const {volume, met} = event.payload;
+                const { volume, met } = event.payload;
                 setActive(met);
+                volumeD = volume
                 console.log(volume);
             });
         })();
@@ -46,36 +50,36 @@ function App() {
 
     useEffect(() => {
         // On enabled change invoke the command to set the enabled state on the backend
-        invoke('set_enabled', {enabled});
-    }, [enabled]);
+        invoke('set_enabled', {enable});
+    }, [enable]);
     // ***************** useEffect *****************
 
     return (
-        <Container>            <VStack>
-
+        <Container>
+            <VStack>
                 <Heading color={'white'} size={'3xl'}>VTC 4</Heading>
                 <Heading color={'white'} size={'xs'}>This program works off your system default audio input device</Heading>
                 <Heading size={'sm'} textAlign={'center'} color={'white'} > Created by Lizard and DrFineSir</Heading>
             </VStack>
-            <VStack mt={8} spacing={10}>
+            <VStack mt={8} spacing={8}>
                 <Heading size={'md'} color={'white'}>Threshold Sensitivity</Heading>
                 <Slider
                     onChange={(value) => setThreshold(value)}
                     onChangeEnd={(value) => setOnce(value)}
                     aria-label='slider-ex-1' defaultValue={30}>
-                    <SliderMark color='white' value={0} mt='1' ml='-2.5' fontSize='sm'>
+                    <SliderMark color='white' value={0} mt='2' ml='-2.5' fontSize='sm'>
                         0
                     </SliderMark>
-                    <SliderMark color='white' value={25} mt='1' ml='-2.5' fontSize='sm'>
+                    <SliderMark color='white' value={25} mt='2' ml='-2.5' fontSize='sm'>
                         25
                     </SliderMark>
-                    <SliderMark color='white' value={50} mt='1' ml='-2.5' fontSize='sm'>
+                    <SliderMark color='white' value={50} mt='2' ml='-2.5' fontSize='sm'>
                         50
                     </SliderMark>
-                    <SliderMark color='white' value={75} mt='1' ml='-2.5' fontSize='sm'>
+                    <SliderMark color='white' value={75} mt='2' ml='-2.5' fontSize='sm'>
                         75
                     </SliderMark>
-                    <SliderMark color='white' value={100} mt='1' ml='-2.5' fontSize='sm'>
+                    <SliderMark color='white' value={100} mt='2' ml='-2.5' fontSize='sm'>
                         100
                     </SliderMark>
                     <SliderMark
@@ -84,18 +88,23 @@ function App() {
                         bg='blue.500'
                         rounded='full'
                         color='white'
-                        mt='-10'
-                        ml='-6'
+                        mt='-3'
+                        ml='6'
                         w='12'
                     >{threshold}
                     </SliderMark>
-                    <SliderTrack >
+                    <SliderTrack defaultValue={volumeD} >
                         <SliderFilledTrack />
                     </SliderTrack>
                     <SliderThumb />
                 </Slider>
+                <Slider>
+                    <SliderTrack >
+                        <SliderFilledTrack />
+                    </SliderTrack>
+                </Slider>
                 <Box  textAlign='center' rounded='full' bg={active ? 'green.600' : 'red.600'} w={"100%"}><b>{active ? 'Would Click' : "Would not Click"}</b></Box>
-                <Checkbox onChange={() => setEnabled(!enabled)} color='white'><b>Enable the Clicky!</b></Checkbox>
+                <Checkbox onChange={(e) => setEnabled(e.currentTarget.checked)} color='white'><b>Enable the Clicky!</b></Checkbox>
             </VStack>
         </Container>
     );
