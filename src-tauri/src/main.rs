@@ -46,6 +46,8 @@ struct State {
     enabled: bool,
     threshold: i32,
     met: bool,
+    one_click_setting: bool,
+    one_click_state: bool,
 }
 
 impl State {
@@ -55,6 +57,8 @@ impl State {
             enabled: false,
             threshold: 30,
             met: false,
+            one_click_setting: false,
+            one_click_state: false,
         }
     }
 
@@ -72,11 +76,19 @@ struct Payload {
 #[tauri::command]
 fn set_enabled(state: tauri::State<Arc<Mutex<State>>>, enable: bool) {
     state.lock().enabled = enable;
+    println!("Enabled: {}", enable);
 }
 
 #[tauri::command]
 fn set_threshold(state: tauri::State<Arc<Mutex<State>>>, threshold: f32) {
     state.lock().threshold = threshold as i32;
+    println!("Threshold: {}", threshold);
+}
+
+#[tauri::command]
+fn set_one_click(state: tauri::State<Arc<Mutex<State>>>, one_click: bool) {
+    state.lock().one_click_setting = one_click;
+    println!("One Click: {}", one_click);
 }
 
 fn main() -> Result<()> {
@@ -132,7 +144,7 @@ fn main() -> Result<()> {
 
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![set_enabled, set_threshold])
+        .invoke_handler(tauri::generate_handler![set_enabled, set_threshold, set_one_click])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 
@@ -150,13 +162,21 @@ fn input_fn(data: &[f32], channel: &mut Sender<Payload>, state: &Mutex<State>) {
 
     let met = volume >= state.threshold;
 
-    if met && state.enabled {
-        state.click();
+    if state.enabled {
+        if met && state.one_click_setting && !state.one_click_state {
+            state.click();
+            state.one_click_state = true;
+        } else if !met && state.one_click_setting && state.one_click_state {
+            state.one_click_state = false;
+        } else if met && !state.one_click_setting {
+            state.click();
+        }
     }
 
     if let Err(e) = channel.send(Payload { volume, met }) {
         eprintln!("errored at sending data: {}", e);
     }
+
 }
 
 fn err_fn(_err: cpal::StreamError) {

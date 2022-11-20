@@ -2,7 +2,7 @@ import React, {useEffect, useState} from 'react';
 import {
     Box, Checkbox,
     Container,
-    Heading, Progress, RangeSliderTrack,
+    Heading, HStack, Progress, RangeSliderTrack,
     Slider,
     SliderFilledTrack, SliderMark,
     SliderThumb,
@@ -26,6 +26,8 @@ function App() {
     const [active, setActive] = useState(false)
     const [enable, setEnabled] = useState(false);
     const [threshold, setThreshold] = useState(30);
+
+    const [oneClick, setOneClick] = useState(false);
 
     // Sketchy work around to send the command one time once set
     const [once, setOnce] = useState(30);
@@ -51,12 +53,16 @@ function App() {
         // On enabled change invoke the command to set the enabled state on the backend
         invoke('set_enabled', {enable});
     }, [enable]);
+
+    useEffect(() => {
+        invoke('set_one_click', {oneClick});
+    }, [oneClick]);
     // ***************** useEffect *****************
 
     return (
         <Container>
             <VStack>
-                <Heading color={'white'} size={'3xl'}>VTC 4</Heading>
+                <Heading color={'white'} size={'3xl'}>VTC 4.20 🌿</Heading>
                 <Heading color={'white'} size={'xs'}>This program works off your system default audio input device</Heading>
                 <Heading size={'sm'} textAlign={'center'} color={'white'} > Created by Lizard and DrFineSir</Heading>
             </VStack>
@@ -99,7 +105,10 @@ function App() {
                 </Slider>
                 <Progress width={'full'} value={volumeD} />
                 <Box  textAlign='center' rounded='full' bg={active ? 'green.600' : 'red.600'} w={"100%"}><b>{active ? 'Would Click' : "Would not Click"}</b></Box>
-                <Checkbox onChange={(e) => setEnabled(e.currentTarget.checked)} color='white'><b>Enable the Clicky!</b></Checkbox>
+                <HStack>
+                    <Checkbox onChange={(e) => setEnabled(e.currentTarget.checked)} color='white'><b>Enable the Clicky</b></Checkbox>
+                    <Checkbox onChange={(e) => setOneClick(e.currentTarget.checked)} color='white'><b>One Click</b></Checkbox>
+                </HStack>
             </VStack>
         </Container>
     );
