@@ -65,6 +65,13 @@ impl State {
     pub fn click(&mut self) {
         self.mouse.mouse_click(MouseButton::Left);
     }
+
+    pub fn mouse_down(&mut self) {
+        self.mouse.mouse_down(MouseButton::Left);
+    }
+    pub fn mouse_up(&mut self) {
+        self.mouse.mouse_up(MouseButton::Left);
+    }
 }
 
 #[derive(Serialize, Clone, Copy)]
@@ -164,9 +171,10 @@ fn input_fn(data: &[f32], channel: &mut Sender<Payload>, state: &Mutex<State>) {
 
     if state.enabled {
         if met && state.one_click_setting && !state.one_click_state {
-            state.click();
+            state.mouse_down();
             state.one_click_state = true;
         } else if !met && state.one_click_setting && state.one_click_state {
+            state.mouse_up();
             state.one_click_state = false;
         } else if met && !state.one_click_setting {
             state.click();
