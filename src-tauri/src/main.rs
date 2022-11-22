@@ -89,13 +89,11 @@ fn set_enabled(state: tauri::State<Arc<Mutex<State>>>, enable: bool) {
 #[tauri::command]
 fn set_threshold(state: tauri::State<Arc<Mutex<State>>>, threshold: f32) {
     state.lock().threshold = threshold as i32;
-    println!("Threshold: {}", threshold);
 }
 
 #[tauri::command]
 fn set_one_click(state: tauri::State<Arc<Mutex<State>>>, one_click: bool) {
     state.lock().one_click_setting = one_click;
-    println!("One Click: {}", one_click);
 }
 
 fn main() -> Result<()> {

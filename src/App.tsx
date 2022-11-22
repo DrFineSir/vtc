@@ -107,7 +107,7 @@ function App() {
                 <Box  textAlign='center' rounded='full' bg={active ? 'green.600' : 'red.600'} w={"100%"}><b>{active ? 'Would Click' : "Would not Click"}</b></Box>
                 <HStack>
                     <Checkbox onChange={(e) => setEnabled(e.currentTarget.checked)} color='white'><b>Enable the Clicky</b></Checkbox>
-                    <Checkbox onChange={(e) => setOneClick(e.currentTarget.checked)} color='white'><b>One Click</b></Checkbox>
+                    <Checkbox onChange={(e) => setOneClick(e.currentTarget.checked)} color='white'><b>One Click (Hold)</b></Checkbox>
                 </HStack>
             </VStack>
         </Container>
